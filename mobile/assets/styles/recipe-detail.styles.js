@@ -178,6 +178,30 @@ export const recipeDetailStyles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  videoThumbnailButton: {
+    flex: 1,
+  },
+  videoThumbnail: {
+    width: "100%",
+    height: "100%",
+  },
+  videoThumbnailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+  videoPlayButton: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginLeft: -30,
+    marginTop: -30,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   webview: {
     flex: 1,
   },

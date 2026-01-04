@@ -7,7 +7,7 @@ import { useFonts } from "expo-font";
 const TabsLayout = () => {
   const { isSignedIn, isLoaded } = useAuth();
   const [fontsLoaded] = useFonts({
-  Raleway: require("../../assets/fonts/Raleway-Bold.ttf"),
+  Raleway: require("../../assets/fonts/Artusi-Bold.ttf"),
   });
 
   if (!isLoaded || !fontsLoaded) return null;
@@ -43,10 +43,12 @@ const TabsLayout = () => {
         headerTitleStyle: {
           marginTop: 0,
           lineHeight: 56,           
-          marginTop: -85,           
+          marginTop: -87,           
           lineHeight: 0,
-          fontFamily: "Raleway",
-          fontSize: 27,
+          fontFamily: "Artusi",
+          fontWeight: "bold",
+          letterSpacing: -0.5,
+          fontSize: 28,
           color: COLORS.primary
         },
         headerTitleContainerStyle: {

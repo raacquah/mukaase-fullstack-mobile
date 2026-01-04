@@ -1,6 +1,7 @@
 import { useSignUp } from "@clerk/clerk-expo";
 import { View, Text, TextInput, TouchableOpacity, Alert, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import { authStyles } from "@/assets/styles/auth.styles";
 import { Image } from "expo-image";
 import { COLORS } from "@/constants/colors";
@@ -8,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const VerifyEmail = ({email, onBack}) => {
 const { isLoaded, signUp, setActive } = useSignUp();
+const router = useRouter();
 const [code, setCode] = useState("");
 const [loading, setLoading] = useState(false);
 
@@ -27,7 +29,10 @@ useEffect(() => {
 
 const handleVerification = async () => {
   if (!isLoaded) return;
-  if (!code.trim()) return;
+  if (!code.trim()) {
+    Alert.alert("Error", "Please enter the verification code");
+    return;
+  }
 
   setLoading(true);
 
@@ -40,30 +45,34 @@ const handleVerification = async () => {
 
     if (attempt.status === "complete") {
       await setActive({ session: attempt.createdSessionId });
-      router.replace("/(tabs)/home");
+      router.replace("/(tabs)");
       return;   // 🛑 stop here, do NOT continue
     }
 
     if (attempt.status === "missing_requirements") {
       const done = await signUp.complete();
       await setActive({ session: done.createdSessionId });
-      router.replace("/(tabs)/home");
+      router.replace("/(tabs)");
       return;
     }
 
-    Alert.alert("Verification Failed", "Please try again.");
+    // If we get here, the status is something unexpected
+    if (isActive) {
+      Alert.alert("Verification Failed", "Please check your code and try again.");
+    }
 
   } catch (err) {
     if (!isActive) return;   // 🛑 ignore late errors
 
     console.log("Verification Error →", err);
-    Alert.alert("Error", err?.errors?.[0]?.message || "Verification failed");
+    const errorMessage = err?.errors?.[0]?.message || "Verification failed. Please check your code and try again.";
+    Alert.alert("Verification Failed", errorMessage);
 
   } finally {
-    setLoading(false);
+    if (isActive) {
+      setLoading(false);
+    }
   }
-
-  return () => { isActive = false };  // 🟢 cancel pending callback
 };
 
 

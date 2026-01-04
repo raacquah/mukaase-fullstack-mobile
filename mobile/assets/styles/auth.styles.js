@@ -15,28 +15,59 @@ export const authStyles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 10,
-    paddingBottom: 10,
+    paddingBottom: 0,
     justifyContent: "center", // center content vertically so form sits in middle
     alignItems: "center", // center content horizontally
   },
-  imageContainer: {
-    flex: 1,
-    height: height * 0.25,
-    marginBottom: 40,
+  imageContainerSignIn: {
+    height: height * 0.18,
+    marginTop: 50,
+    marginBottom: 130,
     justifyContent: "center",
     alignItems: "center",
   },
-  image: {
-    width: 300,
-    height: 300,
+  imageContainerSignUp: {
+    height: height * 0.18,
+    marginTop: 70,
+    marginBottom: 60,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageSignIn: {
+    width: 410,
+    height: 410,
+  },
+  imageSignUp: {
+    width: 260,
+    height: 260,
   },
   title: {
                       // Change font family here
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "bold",
     color: COLORS.text,
     textAlign: "center",
-    marginBottom: 20,
+  },
+  brandTitle: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: COLORS.text,
+    textAlign: "center",
+    marginBottom: 3,
+  },
+  brandSubtitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textLight,
+    textAlign: "center",
+    marginBottom: 18,
+  },
+  typingTextContainer: {
+    height: 80,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
@@ -48,6 +79,7 @@ export const authStyles = StyleSheet.create({
     width: "100%",           // take full width inside ScrollView padding
     alignItems: "center",    // center children horizontally
     justifyContent: "center",
+    marginTop: 3,
     marginBottom: 100,
   },
   inputContainer: {
@@ -104,7 +136,7 @@ export const authStyles = StyleSheet.create({
     width: "100%",
   },
   linkText: {
-    fontSize: 13,
+    fontSize: 14,
     color: COLORS.textLight,
   },
   link: {

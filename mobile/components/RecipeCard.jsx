@@ -7,6 +7,7 @@ import { recipeCardStyles } from "../assets/styles/home.styles";
 
 export default function RecipeCard({ recipe }) {
   const router = useRouter();
+  const isUserRecipe = recipe?.source === "user" || recipe?.isUserRecipe === true;
 
   return (
     <TouchableOpacity
@@ -21,6 +22,12 @@ export default function RecipeCard({ recipe }) {
           contentFit="cover"
           transition={300}
         />
+        {isUserRecipe && (
+          <View style={recipeCardStyles.userRecipeBadge}>
+            <Ionicons name="person" size={12} color={COLORS.white} />
+            <Text style={recipeCardStyles.userRecipeBadgeText}>Yours</Text>
+          </View>
+        )}
       </View>
 
       <View style={recipeCardStyles.content}>

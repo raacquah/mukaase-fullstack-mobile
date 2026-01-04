@@ -1,11 +1,12 @@
-import { View, Text, Alert, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useUser } from "@clerk/clerk-expo";
 import { API_URL } from "../../constants/api";
 import { MealAPI } from "../../services/mealAPI";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { Image } from "expo-image";
+import ToastPopup from "../../components/ToastPopup";
 
 import { recipeDetailStyles } from "../../assets/styles/recipe-detail.styles";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,16 +23,27 @@ const RecipeDetailScreen = () => {
   const [loading, setLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("info");
+  const toastTimerRef = useRef(null);
 
   const { user } = useUser();
   const userId = user?.id;
+  const isNumericId = /^\d+$/.test(String(recipeId ?? ""));
+  const isUserRecipe = !isNumericId;
 
   useEffect(() => {
+    // reset video state when navigating between recipes
+    setShowVideo(false);
+
     const checkIfSaved = async () => {
       try {
         const response = await fetch(`${API_URL}/favorites/${userId}`);
         const favorites = await response.json();
-        const isRecipeSaved = favorites.some((fav) => fav.recipeId === parseInt(recipeId));
+        const isRecipeSaved = favorites.some((fav) => fav.recipeId === parseInt(recipeId, 10));
         setIsSaved(isRecipeSaved);
       } catch (error) {
         console.error("Error checking if recipe is saved:", error);
@@ -41,17 +53,25 @@ const RecipeDetailScreen = () => {
     const loadRecipeDetail = async () => {
       setLoading(true);
       try {
-        const mealData = await MealAPI.getMealById(recipeId);
-        if (mealData) {
-          const transformedRecipe = MealAPI.transformMealData(mealData);
-
-          const recipeWithVideo = {
-            ...transformedRecipe,
-            youtubeUrl: mealData.strYoutube || null,
-          };
-
-          setRecipe(recipeWithVideo);
+        if (isUserRecipe) {
+          const response = await fetch(`${API_URL}/user-recipes/${userId}/${recipeId}`);
+          if (!response.ok) throw new Error("Failed to load user recipe");
+          const userRecipe = await response.json();
+          setRecipe(userRecipe);
+          setIsSaved(true); // it's already "yours", so treat as saved
+          return;
         }
+
+        const mealData = await MealAPI.getMealById(recipeId);
+        if (!mealData) return;
+
+        const transformedRecipe = MealAPI.transformMealData(mealData);
+        const recipeWithVideo = {
+          ...transformedRecipe,
+          youtubeUrl: mealData.strYoutube || null,
+        };
+
+        setRecipe(recipeWithVideo);
       } catch (error) {
         console.error("Error loading recipe detail:", error);
       } finally {
@@ -59,17 +79,78 @@ const RecipeDetailScreen = () => {
       }
     };
 
-    checkIfSaved();
+    if (!isUserRecipe) checkIfSaved();
     loadRecipeDetail();
-  }, [recipeId, userId]);
+  }, [recipeId, userId, isUserRecipe]);
 
-  const getYouTubeEmbedUrl = (url) => {
-    // example url: https://www.youtube.com/watch?v=mTvlmY4vCug
-    const videoId = url.split("v=")[1];
-    return `https://www.youtube.com/embed/${videoId}`;
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const getYouTubeVideoId = (url) => {
+    if (!url) return null;
+    // Handles:
+    // - https://www.youtube.com/watch?v=VIDEO_ID
+    // - https://youtu.be/VIDEO_ID
+    // - https://www.youtube.com/embed/VIDEO_ID
+    const match = url.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+    return match?.[1] ?? null;
+  };
+
+  const getYouTubeEmbedUrl = (videoId) => {
+    if (!videoId) return null;
+    return `https://www.youtube.com/embed/${videoId}?playsinline=1&modestbranding=1&rel=0`;
+  };
+
+  const getYouTubeThumbnailUrl = (videoId) => {
+    if (!videoId) return null;
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  };
+
+  const handleDelete = async () => {
+    Alert.alert(
+      "Delete Recipe",
+      "Are you sure you want to delete this recipe? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              const response = await fetch(`${API_URL}/user-recipes/${userId}/${recipeId}`, {
+                method: "DELETE",
+              });
+
+              if (!response.ok) throw new Error("Failed to delete recipe");
+
+              showToast("Recipe deleted", "success");
+              setTimeout(() => {
+                router.replace("/(tabs)/favorites");
+              }, 1000);
+            } catch (error) {
+              console.error("Error deleting recipe:", error);
+              showToast("Could not delete recipe. Try again.", "error");
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleToggleSave = async () => {
+    if (isUserRecipe) {
+      showToast("This is your recipe", "info");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -81,6 +162,7 @@ const RecipeDetailScreen = () => {
         if (!response.ok) throw new Error("Failed to remove recipe");
 
         setIsSaved(false);
+        showToast("Removed from favorites", "success");
       } else {
         // add to favorites
         const response = await fetch(`${API_URL}/favorites`, {
@@ -90,7 +172,7 @@ const RecipeDetailScreen = () => {
           },
           body: JSON.stringify({
             userId,
-            recipeId: parseInt(recipeId),
+            recipeId: parseInt(recipeId, 10),
             title: recipe.title,
             image: recipe.image,
             cookTime: recipe.cookTime,
@@ -100,19 +182,35 @@ const RecipeDetailScreen = () => {
 
         if (!response.ok) throw new Error("Failed to save recipe");
         setIsSaved(true);
+        showToast("Added to favorites", "success");
       }
     } catch (error) {
       console.error("Error toggling recipe save:", error);
-      Alert.alert("Error", `Something went wrong. Please try again.`);
+      showToast("Could not update favorites. Try again.", "error");
     } finally {
       setIsSaving(false);
     }
   };
 
+  const showToast = (message, type = "info", duration = 2000) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+    toastTimerRef.current = setTimeout(() => setToastVisible(false), duration);
+  };
+
   if (loading) return <LoadingSpinner message="Loading recipe details..." />;
+
+  const youtubeVideoId = getYouTubeVideoId(recipe?.youtubeUrl);
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(youtubeVideoId);
+  const youtubeThumbnailUrl = getYouTubeThumbnailUrl(youtubeVideoId);
 
   return (
     <View style={recipeDetailStyles.container}>
+      <ToastPopup visible={toastVisible} message={toastMessage} type={toastType} />
       <ScrollView showsHorizontalScrollIndicator={false}>
         {/* HEADER */}
         <View style={recipeDetailStyles.headerContainer}>
@@ -132,25 +230,59 @@ const RecipeDetailScreen = () => {
           <View style={recipeDetailStyles.floatingButtons}>
             <TouchableOpacity
               style={recipeDetailStyles.floatingButton}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (isUserRecipe) {
+                  router.replace("/(tabs)/favorites");
+                } else {
+                  router.back();
+                }
+              }}
             >
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                recipeDetailStyles.floatingButton,
-                { backgroundColor: isSaving ? COLORS.gray : COLORS.primary },
-              ]}
-              onPress={handleToggleSave}
-              disabled={isSaving}
-            >
-              <Ionicons
-                name={isSaving ? "hourglass" : isSaved ? "bookmark" : "bookmark-outline"}
-                size={24}
-                color={COLORS.white}
-              />
-            </TouchableOpacity>
+            {isUserRecipe ? (
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <TouchableOpacity
+                  style={[
+                    recipeDetailStyles.floatingButton,
+                    { backgroundColor: COLORS.primary },
+                  ]}
+                  onPress={() => router.push(`/recipe/edit/${recipeId}`)}
+                >
+                  <Ionicons name="create-outline" size={24} color={COLORS.white} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    recipeDetailStyles.floatingButton,
+                    { backgroundColor: isDeleting ? COLORS.gray : "#FF3B30" },
+                  ]}
+                  onPress={handleDelete}
+                  disabled={isDeleting}
+                >
+                  <Ionicons
+                    name={isDeleting ? "hourglass" : "trash-outline"}
+                    size={24}
+                    color={COLORS.white}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  recipeDetailStyles.floatingButton,
+                  { backgroundColor: isSaving ? COLORS.gray : COLORS.primary },
+                ]}
+                onPress={handleToggleSave}
+                disabled={isSaving}
+              >
+                <Ionicons
+                  name={isSaving ? "hourglass" : isSaved ? "bookmark" : "bookmark-outline"}
+                  size={24}
+                  color={COLORS.white}
+                />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Title Section */}
@@ -159,6 +291,11 @@ const RecipeDetailScreen = () => {
               <Text style={recipeDetailStyles.categoryText}>{recipe.category}</Text>
             </View>
             <Text style={recipeDetailStyles.recipeTitle}>{recipe.title}</Text>
+            {isUserRecipe && (
+              <View style={recipeDetailStyles.categoryBadge}>
+                <Text style={recipeDetailStyles.categoryText}>You added this</Text>
+              </View>
+            )}
             {recipe.area && (
               <View style={recipeDetailStyles.locationRow}>
                 <Ionicons name="location" size={16} color={COLORS.white} />
@@ -194,7 +331,7 @@ const RecipeDetailScreen = () => {
             </View>
           </View>
 
-          {recipe.youtubeUrl && (
+          {recipe.youtubeUrl && youtubeVideoId && (
             <View style={recipeDetailStyles.sectionContainer}>
               <View style={recipeDetailStyles.sectionTitleRow}>
                 <LinearGradient
@@ -208,13 +345,34 @@ const RecipeDetailScreen = () => {
               </View>
 
               <View style={recipeDetailStyles.videoCard}>
-                <WebView
-                  style={recipeDetailStyles.webview}
-                  source={{ uri: getYouTubeEmbedUrl(recipe.youtubeUrl) }}
-                  allowsFullscreenVideo
-                  mediaPlaybackRequiresUserAction={false}
-                  
-                />
+                {!showVideo ? (
+                  <TouchableOpacity
+                    style={recipeDetailStyles.videoThumbnailButton}
+                    activeOpacity={0.9}
+                    onPress={() => setShowVideo(true)}
+                  >
+                    <Image
+                      source={{ uri: youtubeThumbnailUrl }}
+                      style={recipeDetailStyles.videoThumbnail}
+                      contentFit="cover"
+                      transition={300}
+                    />
+                    <View style={recipeDetailStyles.videoThumbnailOverlay} />
+                    <View style={recipeDetailStyles.videoPlayButton}>
+                      <Ionicons name="play" size={28} color={COLORS.white} />
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <WebView
+                    style={recipeDetailStyles.webview}
+                    source={{ uri: youtubeEmbedUrl }}
+                    allowsFullscreenVideo
+                    mediaPlaybackRequiresUserAction={false}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    originWhitelist={["*"]}
+                  />
+                )}
               </View>
             </View>
           )}
@@ -287,21 +445,41 @@ const RecipeDetailScreen = () => {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={recipeDetailStyles.primaryButton}
-            onPress={handleToggleSave}
-            disabled={isSaving}
-          >
-            <LinearGradient
-              colors={[COLORS.primary, COLORS.primary + "CC"]}
-              style={recipeDetailStyles.buttonGradient}
+          {!isUserRecipe && (
+            <TouchableOpacity
+              style={recipeDetailStyles.primaryButton}
+              onPress={handleToggleSave}
+              disabled={isSaving}
             >
-              <Ionicons name="heart" size={20} color={COLORS.white} />
-              <Text style={recipeDetailStyles.buttonText}>
-                {isSaved ? "Remove from Favorites" : "Add to Favorites"}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={[COLORS.primary, COLORS.primary + "CC"]}
+                style={recipeDetailStyles.buttonGradient}
+              >
+                <Ionicons name="heart" size={20} color={COLORS.white} />
+                <Text style={recipeDetailStyles.buttonText}>
+                  {isSaved ? "Remove from Favorites" : "Add to Favorites"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {isUserRecipe && (
+            <TouchableOpacity
+              style={[recipeDetailStyles.primaryButton, { opacity: isDeleting ? 0.6 : 1 }]}
+              onPress={handleDelete}
+              disabled={isDeleting}
+            >
+              <LinearGradient
+                colors={["#FF3B30", "#FF2D55"]}
+                style={recipeDetailStyles.buttonGradient}
+              >
+                <Ionicons name="trash" size={20} color={COLORS.white} />
+                <Text style={recipeDetailStyles.buttonText}>
+                  {isDeleting ? "Deleting..." : "Delete Recipe"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </View>

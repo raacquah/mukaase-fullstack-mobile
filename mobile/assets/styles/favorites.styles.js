@@ -74,8 +74,16 @@ export const favoritesStyles = StyleSheet.create({
     marginTop: 24,
     paddingBottom: 32,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.text,
+    letterSpacing: -0.3,
+    marginBottom: 12,
+  },
   recipesGrid: {
     gap: 16,
+    paddingBottom: 18,
   },
   row: {
     justifyContent: "space-between",

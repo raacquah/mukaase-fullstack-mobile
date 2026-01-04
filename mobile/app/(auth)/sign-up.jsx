@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useState, useRef } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, Keyboard } from 'react-native';
 import { useSignUp } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { authStyles } from '@/assets/styles/auth.styles';
@@ -10,10 +10,12 @@ import { Ionicons } from '@expo/vector-icons';
 import VerifyEmail from './verify-email';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export default function SignUpScreen() {
+  export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
   
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
   const [emailAddress, setEmailAddress] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
@@ -21,9 +23,31 @@ export default function SignUpScreen() {
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = useState(false);
   
+  const firstNameInputRef = useRef(null);
+  const lastNameInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const scrollViewRef = useRef(null);
+  
+  const scrollToInput = (inputRef) => {
+    setTimeout(() => {
+      if (inputRef.current && scrollViewRef.current) {
+        try {
+          inputRef.current.measure((x, y, width, height, pageX, pageY) => {
+            if (scrollViewRef.current) {
+              scrollViewRef.current.scrollTo({ y: Math.max(0, pageY - 150), animated: true });
+            }
+          });
+        } catch (error) {
+          // If measure fails, just scroll a bit to ensure input is visible
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }
+      }
+    }, 300);
+  };
+  
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   
-
 if (pendingVerification) { 
   return (
   <VerifyEmail 
@@ -33,14 +57,15 @@ if (pendingVerification) {
   );
 }
 
-
 const handleSignUp = async () => {
   if (loading) return;
 
+  const trimmedFirstName = firstName.trim();
+  const trimmedLastName = lastName.trim();
   const email = emailAddress.trim().toLowerCase();
 
-  if (!email || !password?.trim()) {
-    return Alert.alert("Missing Fields", "Please complete both fields");
+  if (!trimmedFirstName || !trimmedLastName || !email || !password?.trim()) {
+    return Alert.alert("Missing Fields", "Please complete all fields");
   }
 
   if (!emailRegex.test(email)) {
@@ -59,6 +84,8 @@ const handleSignUp = async () => {
     const signUpAttempt = await signUp.create({
       emailAddress: email,
       password,
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
     });
 
     // store sign-up id for verification screen
@@ -87,70 +114,84 @@ const handleSignUp = async () => {
 
 
 
-  
-  
-
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   return (
     <View style={authStyles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        keyboardVerticalOffset={0}
         style={authStyles.keyboardView}>
         
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={authStyles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="interactive">
 
-          <View style={authStyles.imageContainer}>
+          <View style={authStyles.imageContainerSignUp}>
             <Image 
               source={require("../../assets/images/i2.png")}
-              style={authStyles.image}
+              style={authStyles.imageSignUp}
               contentFit="contain"
             />
           </View>
-          <Text style={authStyles.title}>Create an Account</Text>
+          <Text style={authStyles.brandTitle}>Mukaase</Text>
+          <Text style={authStyles.brandSubtitle}>Join the Family</Text>
+
+            {/* Form inputs */}
+            <View style={authStyles.formContainer}>
+            {/* First Name input */}
+            <TextInput
+              ref={firstNameInputRef}
+              style={authStyles.textInput}
+              placeholder='First name'
+              placeholderTextColor={COLORS.textLight}
+              value={firstName}
+              onChangeText={setFirstName}
+              autoCapitalize='words'
+              returnKeyType="next"
+              onSubmitEditing={() => lastNameInputRef.current?.focus()}
+              blurOnSubmit={false}
+              onFocus={() => scrollToInput(firstNameInputRef)}
+            />
+
+            {/* Last Name input */}
+            <TextInput
+              ref={lastNameInputRef}
+              style={[authStyles.textInput, { marginTop: 15 }]}
+              placeholder='Last name'
+              placeholderTextColor={COLORS.textLight}
+              value={lastName}
+              onChangeText={setLastName}
+              autoCapitalize='words'
+              returnKeyType="next"
+              onSubmitEditing={() => emailInputRef.current?.focus()}
+              blurOnSubmit={false}
+              onFocus={() => scrollToInput(lastNameInputRef)}
+            />
 
             {/* Email input */}
-            <View style={authStyles.formContainer}>
             <TextInput
-              style={authStyles.textInput}
+              ref={emailInputRef}
+              style={[authStyles.textInput, { marginTop: 15 }]}
               placeholder='Enter email'
               placeholderTextColor={COLORS.textLight}
               value={emailAddress}
               onChangeText={setEmailAddress}
               keyboardType='email-address'
               autoCapitalize='none'
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              blurOnSubmit={false}
+              onFocus={() => scrollToInput(emailInputRef)}
             />
           
             {/* Password Input */}
           <View style={authStyles.inputContainer}>
             <TextInput
+              ref={passwordInputRef}
               style={authStyles.textInput}
               placeholder="Enter password"
               placeholderTextColor={COLORS.textLight}
@@ -158,6 +199,9 @@ const handleSignUp = async () => {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={() => Keyboard.dismiss()}
+              onFocus={() => scrollToInput(passwordInputRef)}
             />
 
             <TouchableOpacity

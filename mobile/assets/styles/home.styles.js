@@ -208,6 +208,23 @@ export const recipeCardStyles = StyleSheet.create({
     position: "relative",
     height: 140,
   },
+  userRecipeBadge: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.65)",
+  },
+  userRecipeBadgeText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: "700",
+  },
   image: {
     width: "100%",
     height: "100%",

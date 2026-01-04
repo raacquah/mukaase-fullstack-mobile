@@ -1,5 +1,5 @@
-import { View, Text, Alert, KeyboardAvoidingView, Platform, ScrollView, TextInput, TouchableOpacity} from 'react-native';
-import React, { useState } from 'react';
+import { View, Text, Alert, KeyboardAvoidingView, Platform, ScrollView, TextInput, TouchableOpacity, Keyboard} from 'react-native';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'expo-router'
 import { useSignIn } from "@clerk/clerk-expo";
 import { getReactNavigationScreensConfig } from 'expo-router/build/getReactNavigationConfig';
@@ -7,6 +7,7 @@ import { authStyles } from '@/assets/styles/auth.styles';
 import { Image } from "expo-image";
 import { COLORS } from '@/constants/colors';
 import { Ionicons } from "@expo/vector-icons";
+import AnimatedTypingText from '@/components/AnimatedTypingText';
 
 const SignInScreen = () => {
   const router = useRouter();
@@ -16,6 +17,26 @@ const SignInScreen = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const scrollViewRef = useRef(null);
+
+  const scrollToInput = (inputRef) => {
+    setTimeout(() => {
+      if (inputRef.current && scrollViewRef.current) {
+        try {
+          inputRef.current.measure((x, y, width, height, pageX, pageY) => {
+            if (scrollViewRef.current) {
+              scrollViewRef.current.scrollTo({ y: Math.max(0, pageY - 150), animated: true });
+            }
+          });
+        } catch (error) {
+          // If measure fails, just scroll a bit to ensure input is visible
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }
+      }
+    }, 300);
+  };
 
   const handleSignIn = async () => {
   if (!email || !password) {
@@ -36,7 +57,7 @@ const SignInScreen = () => {
 
     if (signInAttempt.status === "complete") {
       await setActive({ session: signInAttempt.createdSessionId });
-      router.replace("/(tabs)/home"); // replace avoids back-nav to login
+      router.replace("/(tabs)"); // replace avoids back-nav to login
       return;
     }
 
@@ -63,39 +84,49 @@ const SignInScreen = () => {
       <KeyboardAvoidingView
         behavior={Platform.OS == "ios" ? "padding" : "height"}
         style={authStyles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 140 : 0} // reduce offset for smoother lift
-        contentInsetAdjustmentBehavior="automatic"
+        keyboardVerticalOffset={0}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={authStyles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          keyboardDismissMode="interactive"
         >
-          <View style={authStyles.imageContainer}>
+          <View style={authStyles.imageContainerSignIn}>
             <Image 
               source={require("../../assets/images/i1.png")} 
-              style={authStyles.image}
+              style={authStyles.imageSignIn}
               contentFit="contain"
             />
           </View>
-          <Text style={authStyles.title}>Welcome Back</Text>
+
+          <View style={authStyles.typingTextContainer}>
+            <AnimatedTypingText style={authStyles.title} />
+          </View>
 
           {/* Text input Container */}
           <View style={authStyles.formContainer}>
             {/* Email Input */}
             <TextInput 
+              ref={emailInputRef}
               style={authStyles.textInput}
               placeholder='Enter email'
               placeholderTextColor={COLORS.textLight}
               value={email}
               onChangeText={setEmail}
               keyboardType='email-address'
-              autoCapitalize='none'        
+              autoCapitalize='none'
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              blurOnSubmit={false}
+              onFocus={() => scrollToInput(emailInputRef)}
             />
 
             {/* Password Input */}
             <View style={authStyles.inputContainer}>
               <TextInput
+                ref={passwordInputRef}
                 style={authStyles.textInput}
                 placeholder="Enter password"
                 placeholderTextColor={COLORS.textLight}
@@ -103,6 +134,9 @@ const SignInScreen = () => {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={() => Keyboard.dismiss()}
+                onFocus={() => scrollToInput(passwordInputRef)}
               />
 
               <TouchableOpacity
@@ -135,8 +169,8 @@ const SignInScreen = () => {
             onPress={() => router.push("/(auth)/sign-up")}
             activeOpacity={0.7}
           >
-            <Text style={authStyles.linkText}>
-              New to Flavor Bank? <Text style={authStyles.link}>Create an account</Text>
+            <Text style={authStyles.linkText}>New to Mukaase?
+              <Text style={authStyles.link}>Create an account</Text>
             </Text>
           </TouchableOpacity>
 

@@ -1,11 +1,34 @@
 const BASE_URL = "https://www.themealdb.com/api/json/v1/1";
 
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
+
+  // If the API returns HTML/text (e.g. captive portal, rate limit, proxy), .json() will throw
+  // "Unexpected character" errors. Read text first, then JSON.parse for better diagnostics.
+  const rawText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText} for ${url}. Body: ${rawText.slice(0, 200)}`
+    );
+  }
+
+  try {
+    return JSON.parse(rawText);
+  } catch (e) {
+    throw new Error(
+      `Non-JSON response for ${url}. First 200 chars: ${rawText.slice(0, 200)}`
+    );
+  }
+}
+
 export const MealAPI = {
   // search meal by name
   searchMealsByName: async (query) => {
     try {
-      const response = await fetch(`${BASE_URL}/search.php?s=${encodeURIComponent(query)}`);
-      const data = await response.json();
+      const data = await fetchJson(`${BASE_URL}/search.php?s=${encodeURIComponent(query)}`);
       return data.meals || [];
     } catch (error) {
       console.error("Error searching meals by name:", error);
@@ -16,8 +39,7 @@ export const MealAPI = {
   // lookup full meal details by id
   getMealById: async (id) => {
     try {
-      const response = await fetch(`${BASE_URL}/lookup.php?i=${id}`);
-      const data = await response.json();
+      const data = await fetchJson(`${BASE_URL}/lookup.php?i=${id}`);
       return data.meals ? data.meals[0] : null;
     } catch (error) {
       console.error("Error getting meal by id:", error);
@@ -28,8 +50,7 @@ export const MealAPI = {
   // lookup a single random meal
   getRandomMeal: async () => {
     try {
-      const response = await fetch(`${BASE_URL}/random.php`);
-      const data = await response.json();
+      const data = await fetchJson(`${BASE_URL}/random.php`);
       return data.meals ? data.meals[0] : null;
     } catch (error) {
       console.error("Error getting random meal:", error);
@@ -54,8 +75,7 @@ export const MealAPI = {
   // list all meal categories
   getCategories: async () => {
     try {
-      const response = await fetch(`${BASE_URL}/categories.php`);
-      const data = await response.json();
+      const data = await fetchJson(`${BASE_URL}/categories.php`);
       return data.categories || [];
     } catch (error) {
       console.error("Error getting categories:", error);
@@ -66,8 +86,7 @@ export const MealAPI = {
   // filter by main ingredient
   filterByIngredient: async (ingredient) => {
     try {
-      const response = await fetch(`${BASE_URL}/filter.php?i=${encodeURIComponent(ingredient)}`);
-      const data = await response.json();
+      const data = await fetchJson(`${BASE_URL}/filter.php?i=${encodeURIComponent(ingredient)}`);
       return data.meals || [];
     } catch (error) {
       console.error("Error filtering by ingredient:", error);
@@ -78,8 +97,7 @@ export const MealAPI = {
   // filter by category
   filterByCategory: async (category) => {
     try {
-      const response = await fetch(`${BASE_URL}/filter.php?c=${encodeURIComponent(category)}`);
-      const data = await response.json();
+      const data = await fetchJson(`${BASE_URL}/filter.php?c=${encodeURIComponent(category)}`);
       return data.meals || [];
     } catch (error) {
       console.error("Error filtering by category:", error);
