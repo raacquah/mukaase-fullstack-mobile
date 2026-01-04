@@ -262,6 +262,74 @@ app.get("/api/user-recipes/:userId/:recipeId", async (req, res) => {
   }
 });
 
+app.put("/api/user-recipes/:userId/:recipeId", async (req, res) => {
+  try {
+    const { userId, recipeId } = req.params;
+    const {
+      title,
+      image,
+      cookTime,
+      servings,
+      category,
+      area,
+      youtubeUrl,
+      ingredients,
+      instructions,
+    } = req.body ?? {};
+
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    const ingredientsArr = normalizeStringArray(ingredients);
+    const instructionsArr = normalizeStringArray(instructions);
+
+    if (ingredientsArr.length === 0) {
+      return res.status(400).json({ error: "Ingredients are required" });
+    }
+    if (instructionsArr.length === 0) {
+      return res.status(400).json({ error: "Instructions are required" });
+    }
+
+    const servingsInt =
+      typeof servings === "number"
+        ? servings
+        : typeof servings === "string" && servings.trim()
+          ? parseInt(servings, 10)
+          : null;
+
+    const updated = await db
+      .update(userRecipesTable)
+      .set({
+        title,
+        image: image ?? null,
+        cookTime: cookTime ?? null,
+        servings: Number.isFinite(servingsInt) ? servingsInt : null,
+        category: category ?? null,
+        area: area ?? null,
+        youtubeUrl: youtubeUrl ?? null,
+        ingredientsJson: JSON.stringify(ingredientsArr),
+        instructionsJson: JSON.stringify(instructionsArr),
+      })
+      .where(and(eq(userRecipesTable.userId, userId), eq(userRecipesTable.id, recipeId)))
+      .returning();
+
+    if (updated.length === 0) {
+      return res.status(404).json({ error: "Recipe not found" });
+    }
+
+    res.status(200).json({
+      ...updated[0],
+      ingredients: ingredientsArr,
+      instructions: instructionsArr,
+      source: "user",
+    });
+  } catch (error) {
+    console.error("Error updating user recipe:", error);
+    res.status(500).json({ error: "Failed to update recipe", details: error.message });
+  }
+});
+
 app.delete("/api/user-recipes/:userId/:recipeId", async (req, res) => {
   try {
     const { userId, recipeId } = req.params;
