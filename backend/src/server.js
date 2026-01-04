@@ -112,6 +112,24 @@ app.delete("/api/favorites/:userId/:recipeId", async (req, res) => {
 // User-created recipes
 // ----------------------------
 
+function normalizeStringArray(input) {
+  // Accept string[] or a single string (e.g. textarea) and normalize to string[].
+  if (Array.isArray(input)) {
+    return input.map((s) => String(s).trim()).filter(Boolean);
+  }
+  if (typeof input === "string") {
+    // Split on common newline types, and also support semicolon-separated content.
+    const parts = input
+      .split(/\r\n|\r|\n|\u2028|\u2029|;/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    // If it was a single non-empty paragraph with no separators, keep it.
+    if (parts.length === 0 && input.trim()) return [input.trim()];
+    return parts;
+  }
+  return [];
+}
+
 app.post("/api/user-recipes", async (req, res) => {
   try {
     const {
@@ -131,12 +149,8 @@ app.post("/api/user-recipes", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields: userId, title" });
     }
 
-    const ingredientsArr = Array.isArray(ingredients)
-      ? ingredients.map((s) => String(s).trim()).filter(Boolean)
-      : [];
-    const instructionsArr = Array.isArray(instructions)
-      ? instructions.map((s) => String(s).trim()).filter(Boolean)
-      : [];
+    const ingredientsArr = normalizeStringArray(ingredients);
+    const instructionsArr = normalizeStringArray(instructions);
 
     if (ingredientsArr.length === 0) {
       return res.status(400).json({ error: "Ingredients are required" });
@@ -147,6 +161,13 @@ app.post("/api/user-recipes", async (req, res) => {
 
     const id = crypto.randomUUID();
 
+    const servingsInt =
+      typeof servings === "number"
+        ? servings
+        : typeof servings === "string" && servings.trim()
+          ? parseInt(servings, 10)
+          : null;
+
     const inserted = await db
       .insert(userRecipesTable)
       .values({
@@ -155,7 +176,7 @@ app.post("/api/user-recipes", async (req, res) => {
         title,
         image: image ?? null,
         cookTime: cookTime ?? null,
-        servings: typeof servings === "number" ? servings : servings ? parseInt(servings, 10) : null,
+        servings: Number.isFinite(servingsInt) ? servingsInt : null,
         category: category ?? null,
         area: area ?? null,
         youtubeUrl: youtubeUrl ?? null,
